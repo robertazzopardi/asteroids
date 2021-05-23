@@ -1,78 +1,51 @@
+use crate::window::SIZE;
 use rand::Rng;
-use sdl2::{gfx::primitives::DrawRenderer, pixels::Color, render::Canvas, video::Window};
+use std::f32::consts::PI;
 
-use crate::window::Draw;
-
-pub struct Pos {
+#[derive(Clone)]
+pub struct Vec2 {
     pub x: f32,
     pub y: f32,
 }
 
-impl Pos {
+pub trait UpdateVerts {
+    fn get_verts(&mut self) -> &mut Vec<Vec2>;
+    fn get_ghost_verts(&mut self) -> &mut Vec<Vec2>;
+
+    fn swap(&mut self);
+}
+
+impl Vec2 {
     pub fn new(x: f32, y: f32) -> Self {
         Self { x, y }
     }
-}
 
-pub struct Triangle {
-    pub p1: Pos,
-    pub p2: Pos,
-    pub p3: Pos,
-}
-
-// impl Translate for Triangle {
-//     fn translate(&mut self, angle: f32) {
-//         self.p1.x += 1. * angle.cos();
-//         self.p1.y += 1. * angle.sin();
-
-//         self.p2.x += 1. * angle.cos();
-//         self.p2.y += 1. * angle.sin();
-
-//         self.p3.x += 1. * angle.cos();
-//         self.p3.y += 1. * angle.sin();
-//     }
-// }
-
-pub fn translate(points: &mut [&mut Pos], angle: f32) {
-    for point in points.iter_mut() {
-        point.x += 1. * angle.cos();
-        point.y += 1. * angle.sin();
+    pub fn magnitude(&self) -> f32 {
+        (self.x.powf(2.) + self.y.powf(2.)).sqrt()
     }
 }
 
-impl Draw for Triangle {
-    fn draw(&self, canvas: &Canvas<Window>) {
-        let _ = canvas.filled_trigon(
-            self.p1.x as i16,
-            self.p1.y as i16,
-            self.p2.x as i16,
-            self.p2.y as i16,
-            self.p3.x as i16,
-            self.p3.y as i16,
-            Color::WHITE,
-        );
-    }
+pub fn rand_angle() -> f32 {
+    2. * PI * rand::thread_rng().gen::<f32>()
 }
 
-impl Triangle {
-    pub fn new(p1: Pos, p2: Pos, p3: Pos) -> Self {
-        Self { p1, p2, p3 }
-    }
+pub fn get_center(verts: &[Vec2]) -> Vec2 {
+    let sum_x: f32 = verts.iter().map(|f| f.x).sum();
+    let sum_y: f32 = verts.iter().map(|f| f.y).sum();
 
-    pub fn get_center(&self) -> Pos {
-        let x = (self.p1.x + self.p2.x + self.p3.x) / 3.;
-        let y = (self.p1.y + self.p2.y + self.p3.y) / 3.;
-        return Pos::new(x, y);
-    }
+    let x = sum_x / verts.len() as f32;
+    let y = sum_y / verts.len() as f32;
+
+    Vec2::new(x, y)
 }
 
-pub fn rotate(points: &mut [&mut Pos], origin: Pos, angle: f32) {
+pub fn rotate(verts: &mut Vec<Vec2>, origin: Vec2, angle: f32) {
     let cos = angle.cos();
     let sin = angle.sin();
 
-    for pos in points.iter_mut() {
-        let px = pos.x as f32 - origin.x;
-        let py = pos.y as f32 - origin.y;
+    for pos in verts.iter_mut() {
+        let px = pos.x - origin.x;
+        let py = pos.y - origin.y;
 
         let tmp_x = origin.x + cos * px - sin * py;
         pos.y = origin.y + sin * px + cos * py;
@@ -80,6 +53,89 @@ pub fn rotate(points: &mut [&mut Pos], origin: Pos, angle: f32) {
     }
 }
 
-pub fn random_pos(min: f32, max: f32) -> f32 {
-    return rand::thread_rng().gen_range(min..max);
+pub fn wrap_point(point: &mut Vec2) {
+    if point.y < 0. {
+        point.y += SIZE;
+    }
+    if point.y > SIZE {
+        point.y -= SIZE;
+    }
+    if point.x < 0. {
+        point.x += SIZE;
+    }
+    if point.x > SIZE {
+        point.x -= SIZE;
+    }
+}
+
+// pub fn point_collision(vec1: &Vec2, vec2: &Vec2, radius: &f32) -> bool {
+//     ((vec1.x - vec2.x) * (vec1.x - vec2.x) + (vec1.y - vec2.y) * (vec1.y - vec2.y)).sqrt() < *radius
+// }
+
+// Algorithm from https://stackoverflow.com/a/2922778/8742929
+// Raytracing like
+pub fn polygon_collision(verts: &[Vec2], point: &Vec2) -> bool {
+    let mut collision = false;
+    let mut j = verts.len() - 1;
+
+    for i in 0..verts.len() {
+        if ((verts[i].y > point.y) != (verts[j].y > point.y))
+            && (point.x
+                < (verts[j].x - verts[i].x) * (point.y - verts[i].y) / (verts[j].y - verts[i].y)
+                    + verts[i].x)
+        {
+            collision = !collision;
+        }
+        j = i;
+    }
+
+    collision
+}
+
+pub fn wrap_verts<T: UpdateVerts>(main: &mut T) {
+    if main.get_verts().iter().any(|f| f.y < 0.) {
+        for i in 0..main.get_ghost_verts().len() {
+            main.get_ghost_verts()[i].y = main.get_verts()[i].y + SIZE;
+            main.get_ghost_verts()[i].x = main.get_verts()[i].x;
+        }
+    }
+    if main.get_verts().iter().any(|f| f.y > SIZE) {
+        for i in 0..main.get_ghost_verts().len() {
+            main.get_ghost_verts()[i].y = main.get_verts()[i].y - SIZE;
+            main.get_ghost_verts()[i].x = main.get_verts()[i].x;
+        }
+    }
+
+    if main.get_verts().iter().any(|f| f.x < 0.) {
+        for i in 0..main.get_ghost_verts().len() {
+            main.get_ghost_verts()[i].x = main.get_verts()[i].x + SIZE;
+            main.get_ghost_verts()[i].y = main.get_verts()[i].y;
+        }
+    }
+    if main.get_verts().iter().any(|f| f.x > SIZE) {
+        for i in 0..main.get_ghost_verts().len() {
+            main.get_ghost_verts()[i].x = main.get_verts()[i].x - SIZE;
+            main.get_ghost_verts()[i].y = main.get_verts()[i].y;
+        }
+    }
+
+    if main
+        .get_verts()
+        .iter()
+        .all(|f| (f.y < 0. || f.y > SIZE) || (f.x < 0. || f.x > SIZE))
+    {
+        main.swap();
+    }
+}
+
+pub fn convert_to_xy_vec(vec: &[Vec2]) -> (Vec<i16>, Vec<i16>) {
+    let mut array_x = Vec::new();
+    let mut array_y = Vec::new();
+
+    for i in 0..vec.len() {
+        array_x.push(vec[i].x as i16);
+        array_y.push(vec[i].y as i16);
+    }
+
+    (array_x, array_y)
 }
