@@ -1,8 +1,8 @@
 use crate::{
-    asteroid::{divide_remove, draw_asteroids, Asteroid},
-    math::{polygon_collision, wrap_verts},
+    asteroid::{divide_remove, Asteroid},
+    math::wrap_verts,
     ship::Ship,
-    star::{draw_stars, Star},
+    star::Star,
 };
 use rand::Rng;
 use sdl2::{
@@ -18,6 +18,7 @@ use std::time::Duration;
 
 pub const SIZE: f32 = 800.;
 pub const MID_SIZE: f32 = SIZE / 2.;
+const NANOS: u32 = 1_000_000_000u32 / 60;
 
 pub struct Win {
     canvas: Canvas<Window>,
@@ -59,6 +60,8 @@ impl Win {
         let ship = &mut Ship::new();
         let asteroids = &mut Asteroid::new_vec();
 
+        let duration = Duration::new(0, NANOS);
+
         'running: loop {
             let last = now;
             unsafe {
@@ -87,24 +90,23 @@ impl Win {
             // update entities
             ship.update(dt);
 
-            for i in 0..asteroids.len() {
-                asteroids[i].update();
+            for asteroid in asteroids.iter_mut() {
+                asteroid.update();
             }
 
             // spawn random asteroid with 1% chance
-            // if rand::thread_rng().gen::<f32>() < 0.01 {
-            //     let center = get_edge_pos();
-            //     let new_asteroid = Asteroid::new(40, 100, center.0, center.1);
-            //     asteroids.push(new_asteroid.clone());
-            //     ghost_asteroids.push(new_asteroid);
-            // }
+            if rand::thread_rng().gen::<f32>() < 0.005 && asteroids.len() < 11 {
+                let center = get_edge_pos();
+                let new_asteroid = Asteroid::new(40, 100, center.0, center.1);
+                asteroids.push(new_asteroid.clone());
+            }
 
             // check collisions
             let mut to_remove: Vec<usize> = Vec::new();
-            for i in 0..ship.lasers.len() {
+            for i in 0..ship.get_lasers().len() {
                 let index = asteroids
-                    .iter()
-                    .position(|f| polygon_collision(&f.verts, &ship.lasers[i].pos));
+                    .iter_mut()
+                    .position(|f| f.collision(&ship.get_lasers()[i].get_pos()));
                 if index != None {
                     divide_remove(asteroids, index.unwrap());
                     to_remove.push(i);
@@ -112,14 +114,16 @@ impl Win {
             }
 
             for i in to_remove {
-                ship.lasers.remove(i);
+                ship.remove_laser(i);
             }
 
-            for asteroid in asteroids.iter() {
-                if ship.verts.iter().zip(&ship.ghost_verts).any(|f| {
-                    polygon_collision(&asteroid.verts, f.0)
-                        || polygon_collision(&asteroid.verts, f.1)
-                }) {
+            for asteroid in asteroids.iter_mut() {
+                if ship
+                    .get_verts()
+                    .iter()
+                    .zip(ship.get_ghost_verts())
+                    .any(|f| asteroid.collision(f.0) || asteroid.collision(f.1))
+                {
                     break 'running;
                 }
             }
@@ -127,19 +131,17 @@ impl Win {
             // check wrapping
             wrap_verts(ship);
 
-            for i in 0..asteroids.len() {
-                wrap_verts(&mut asteroids[i]);
-            }
+            asteroids.iter_mut().for_each(|f| wrap_verts(f));
 
             // draw entities
-            draw_stars(stars, &self.canvas);
+            stars.iter_mut().for_each(|f| f.draw(&self.canvas));
             ship.draw(&self.canvas);
-            draw_asteroids(asteroids, &self.canvas);
+            asteroids.iter_mut().for_each(|f| f.draw(&self.canvas));
 
             self.canvas.set_draw_color(Color::BLACK);
 
             self.canvas.present();
-            ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
+            ::std::thread::sleep(duration);
         }
     }
 }
@@ -153,15 +155,11 @@ pub fn get_edge_pos() -> (f32, f32) {
         } else {
             width = SIZE;
         }
+    } else if rand::thread_rng().gen_bool(0.5) {
+        height = 0.;
     } else {
-        if rand::thread_rng().gen_bool(0.5) {
-            height = 0.;
-        } else {
-            height = SIZE;
-        }
+        height = SIZE;
     }
-
-    // println!("{} {}", width, height);
 
     (width, height)
 }

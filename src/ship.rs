@@ -1,5 +1,8 @@
-use crate::math::{convert_to_xy_vec, get_center, rotate, wrap_point, UpdateVerts};
 use crate::{math::Vec2, window::MID_SIZE};
+use crate::{
+    math::{convert_to_xy_vec, get_center, rotate, wrap_point, UpdateVerts},
+    window::SIZE,
+};
 use sdl2::{
     event::Event, gfx::primitives::DrawRenderer, keyboard::Keycode, pixels::Color, render::Canvas,
     video::Window,
@@ -9,16 +12,16 @@ use std::mem;
 pub const SHIP_SCALE: f32 = 7.;
 
 pub struct Ship {
-    pub verts: Vec<Vec2>,
-    pub ghost_verts: Vec<Vec2>,
+    verts: Vec<Vec2>,
+    ghost_verts: Vec<Vec2>,
     vel: Vec2,
     accel: f32,
     angle: f32,
-    pub lasers: Vec<Laser>,
+    lasers: Vec<Laser>,
 }
 
 pub struct Laser {
-    pub pos: Vec2,
+    pos: Vec2,
     vel: Vec2,
     angle: f32,
     ddelta: f32,
@@ -44,6 +47,10 @@ impl Laser {
         self.pos.x += self.vel.x * dt * self.angle.cos();
         self.pos.y += self.vel.y * dt * self.angle.sin();
     }
+
+    pub fn get_pos(&self) -> &Vec2 {
+        &self.pos
+    }
 }
 
 impl UpdateVerts for Ship {
@@ -65,23 +72,37 @@ impl UpdateVerts for Ship {
 }
 
 impl Ship {
+    pub fn get_lasers(&mut self) -> &mut Vec<Laser> {
+        &mut self.lasers
+    }
+
+    pub fn get_verts(&self) -> &Vec<Vec2> {
+        &self.verts
+    }
+
+    pub fn get_ghost_verts(&self) -> &Vec<Vec2> {
+        &self.ghost_verts
+    }
+
+    pub fn remove_laser(&mut self, index: usize) {
+        self.lasers.remove(index);
+    }
+
     pub fn do_action(&mut self, event: &Event, dt: &f32) {
         match event {
             Event::KeyDown {
                 keycode: Some(Keycode::Right),
                 ..
             } => {
-                let origin = get_center(&self.verts);
-                rotate(&mut self.verts, origin.clone(), 10. * dt);
-                rotate(&mut self.ghost_verts, origin, 10. * dt);
+                rotate(&mut self.verts, 10. * dt);
+                rotate(&mut self.ghost_verts, 10. * dt);
             }
             Event::KeyDown {
                 keycode: Some(Keycode::Left),
                 ..
             } => {
-                let origin = get_center(&self.verts);
-                rotate(&mut self.verts, origin.clone(), -10. * dt);
-                rotate(&mut self.ghost_verts, origin, -10. * dt);
+                rotate(&mut self.verts, -10. * dt);
+                rotate(&mut self.ghost_verts, -10. * dt);
             }
             Event::KeyDown {
                 keycode: Some(Keycode::Up),
@@ -121,15 +142,19 @@ impl Ship {
         self.vel.x *= 0.97;
         self.vel.y *= 0.97;
 
-        self.vel.x += self.accel * dt * 50.;
-        self.vel.y += self.accel * dt * 50.;
+        let dv = self.accel * dt * 50.;
+        self.vel.x += dv;
+        self.vel.y += dv;
 
-        for (vert, ghost) in self.verts.iter_mut().zip(self.ghost_verts.iter_mut()) {
-            vert.x += self.vel.x * dt * self.angle.cos();
-            vert.y += self.vel.y * dt * self.angle.sin();
+        let vel_x = self.vel.x * dt * self.angle.cos();
+        let vel_y = self.vel.y * dt * self.angle.sin();
 
-            ghost.x += self.vel.x * dt * self.angle.cos();
-            ghost.y += self.vel.y * dt * self.angle.sin();
+        for i in 0..self.verts.len() {
+            self.verts[i].x += vel_x;
+            self.verts[i].y += vel_y;
+
+            self.ghost_verts[i].x += vel_x;
+            self.ghost_verts[i].y += vel_y;
         }
 
         // update lasers
@@ -160,8 +185,15 @@ impl Ship {
         let dxy = convert_to_xy_vec(&self.verts);
         let _ = canvas.filled_polygon(&dxy.0, &dxy.1, Color::WHITE);
 
-        let dxy = convert_to_xy_vec(&self.ghost_verts);
-        let _ = canvas.filled_polygon(&dxy.0, &dxy.1, Color::WHITE);
+        // if self.verts != self.ghost_verts {
+        if !self
+            .verts
+            .iter()
+            .all(|f| f.x < SIZE && f.x > 0. && f.y < SIZE && f.y > 0.)
+        {
+            let dxy = convert_to_xy_vec(&self.ghost_verts);
+            let _ = canvas.filled_polygon(&dxy.0, &dxy.1, Color::WHITE);
+        }
 
         for laser in self.lasers.iter_mut() {
             wrap_point(&mut laser.pos);

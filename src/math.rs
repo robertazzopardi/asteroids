@@ -2,7 +2,7 @@ use crate::window::SIZE;
 use rand::Rng;
 use std::f32::consts::PI;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct Vec2 {
     pub x: f32,
     pub y: f32,
@@ -39,7 +39,8 @@ pub fn get_center(verts: &[Vec2]) -> Vec2 {
     Vec2::new(x, y)
 }
 
-pub fn rotate(verts: &mut Vec<Vec2>, origin: Vec2, angle: f32) {
+pub fn rotate(verts: &mut Vec<Vec2>, angle: f32) {
+    let origin = get_center(verts);
     let cos = angle.cos();
     let sin = angle.sin();
 
@@ -74,48 +75,45 @@ pub fn wrap_point(point: &mut Vec2) {
 
 // Algorithm from https://stackoverflow.com/a/2922778/8742929
 // Raytracing like
-pub fn polygon_collision(verts: &[Vec2], point: &Vec2) -> bool {
-    let mut collision = false;
-    let mut j = verts.len() - 1;
+// pub fn polygon_collision(verts: &[Vec2], point: &Vec2) -> bool {
+//     let mut collision = false;
+//     let mut j = verts.len() - 1;
 
-    for i in 0..verts.len() {
-        if ((verts[i].y > point.y) != (verts[j].y > point.y))
-            && (point.x
-                < (verts[j].x - verts[i].x) * (point.y - verts[i].y) / (verts[j].y - verts[i].y)
-                    + verts[i].x)
-        {
-            collision = !collision;
-        }
-        j = i;
-    }
+//     for i in 0..verts.len() {
+//         if ((verts[i].y > point.y) != (verts[j].y > point.y))
+//             && (point.x
+//                 < (verts[j].x - verts[i].x) * (point.y - verts[i].y) / (verts[j].y - verts[i].y)
+//                     + verts[i].x)
+//         {
+//             collision = !collision;
+//         }
+//         j = i;
+//     }
 
-    collision
-}
+//     collision
+// }
 
 pub fn wrap_verts<T: UpdateVerts>(main: &mut T) {
+    let mut x = 0.;
+    let mut y = 0.;
+
     if main.get_verts().iter().any(|f| f.y < 0.) {
-        for i in 0..main.get_ghost_verts().len() {
-            main.get_ghost_verts()[i].y = main.get_verts()[i].y + SIZE;
-            main.get_ghost_verts()[i].x = main.get_verts()[i].x;
-        }
+        y = SIZE;
     }
     if main.get_verts().iter().any(|f| f.y > SIZE) {
-        for i in 0..main.get_ghost_verts().len() {
-            main.get_ghost_verts()[i].y = main.get_verts()[i].y - SIZE;
-            main.get_ghost_verts()[i].x = main.get_verts()[i].x;
-        }
+        y = -SIZE;
     }
-
     if main.get_verts().iter().any(|f| f.x < 0.) {
-        for i in 0..main.get_ghost_verts().len() {
-            main.get_ghost_verts()[i].x = main.get_verts()[i].x + SIZE;
-            main.get_ghost_verts()[i].y = main.get_verts()[i].y;
-        }
+        x = SIZE;
     }
     if main.get_verts().iter().any(|f| f.x > SIZE) {
+        x = -SIZE;
+    }
+
+    if (x - y).abs() > 0. {
         for i in 0..main.get_ghost_verts().len() {
-            main.get_ghost_verts()[i].x = main.get_verts()[i].x - SIZE;
-            main.get_ghost_verts()[i].y = main.get_verts()[i].y;
+            main.get_ghost_verts()[i].x = main.get_verts()[i].x + x;
+            main.get_ghost_verts()[i].y = main.get_verts()[i].y + y;
         }
     }
 
@@ -132,9 +130,9 @@ pub fn convert_to_xy_vec(vec: &[Vec2]) -> (Vec<i16>, Vec<i16>) {
     let mut array_x = Vec::new();
     let mut array_y = Vec::new();
 
-    for i in 0..vec.len() {
-        array_x.push(vec[i].x as i16);
-        array_y.push(vec[i].y as i16);
+    for v in vec {
+        array_x.push(v.x as i16);
+        array_y.push(v.y as i16);
     }
 
     (array_x, array_y)
