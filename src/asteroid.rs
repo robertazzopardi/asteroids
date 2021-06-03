@@ -33,14 +33,6 @@ impl UpdateVerts for Asteroid {
 }
 
 impl Asteroid {
-    // pub fn get_verts(&self) -> &Vec<Vec2> {
-    //     &self.verts
-    // }
-
-    // pub fn get_ghost_verts(&self) -> &Vec<Vec2> {
-    //     &self.ghost_verts
-    // }
-
     pub fn new_vec() -> Vec<Asteroid> {
         let mut asteroids: Vec<Asteroid> = Vec::new();
         for _ in 0..ASTEROID_COUNT {
@@ -109,19 +101,35 @@ impl Asteroid {
         }
     }
 
-    pub fn collision(&mut self, point: &Vec2) -> bool {
-        let mut collision = false;
-        let mut j = self.verts.len() - 1;
+    // pub fn collision(&mut self, point: &Vec2) -> bool {
+    //     let mut collision = false;
+    //     let mut j = self.verts.len() - 1;
 
-        for i in 0..self.verts.len() {
-            if trace(&self.verts, i, point, j) || trace(&self.ghost_verts, i, point, j) {
-                collision = !collision;
-            }
-            j = i;
+    //     for i in 0..self.verts.len() {
+    //         if trace(&self.verts, i, point, j) {
+    //             // || trace(&self.ghost_verts, i, point, j) {
+    //             collision = !collision;
+    //         }
+    //         j = i;
+    //     }
+
+    //     collision
+    // }
+}
+
+pub fn collision(verts: &mut Vec<Vec2>, point: &Vec2) -> bool {
+    let mut collision = false;
+    let mut j = verts.len() - 1;
+
+    for i in 0..verts.len() {
+        if trace(verts, i, point, j) {
+            // || trace(&self.ghost_verts, i, point, j) {
+            collision = !collision;
         }
-
-        collision
+        j = i;
     }
+
+    collision
 }
 
 #[inline]

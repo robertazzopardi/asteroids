@@ -1,6 +1,6 @@
 use crate::{
-    asteroid::{divide_remove, Asteroid},
-    math::wrap_verts,
+    asteroid::{collision, divide_remove, Asteroid},
+    math::{wrap_verts, UpdateVerts},
     ship::Ship,
     star::Star,
 };
@@ -19,6 +19,38 @@ use std::time::Duration;
 pub const SIZE: f32 = 800.;
 pub const MID_SIZE: f32 = SIZE / 2.;
 const NANOS: u32 = 1_000_000_000u32 / 60;
+
+pub trait GetKey {
+    fn get_keycode(&self) -> (Keycode, &Event);
+}
+
+impl GetKey for Event {
+    fn get_keycode(&self) -> (Keycode, &Event) {
+        match self {
+            Event::KeyDown {
+                keycode: Some(Keycode::Right),
+                ..
+            } => (Keycode::Right, self),
+            Event::KeyDown {
+                keycode: Some(Keycode::Left),
+                ..
+            } => (Keycode::Left, self),
+            Event::KeyDown {
+                keycode: Some(Keycode::Up),
+                ..
+            } => (Keycode::Up, self),
+            Event::KeyDown {
+                keycode: Some(Keycode::Space),
+                ..
+            } => (Keycode::Space, self),
+            Event::KeyUp {
+                keycode: Some(Keycode::Up),
+                ..
+            } => (Keycode::Up, self),
+            _ => (Keycode::T, self),
+        }
+    }
+}
 
 pub struct Win {
     canvas: Canvas<Window>,
@@ -63,6 +95,7 @@ impl Win {
         let duration = Duration::new(0, NANOS);
 
         'running: loop {
+            // Get delta time
             let last = now;
             unsafe {
                 now = SDL_GetPerformanceCounter();
@@ -94,7 +127,7 @@ impl Win {
                 asteroid.update();
             }
 
-            // spawn random asteroid with 1% chance
+            // spawn asteroid randomly with low chance
             if rand::thread_rng().gen::<f32>() < 0.005 && asteroids.len() < 11 {
                 let center = get_edge_pos();
                 let new_asteroid = Asteroid::new(40, 100, center.0, center.1);
@@ -104,9 +137,10 @@ impl Win {
             // check collisions
             let mut to_remove: Vec<usize> = Vec::new();
             for i in 0..ship.get_lasers().len() {
-                let index = asteroids
-                    .iter_mut()
-                    .position(|f| f.collision(&ship.get_lasers()[i].get_pos()));
+                let index = asteroids.iter_mut().position(|f| {
+                    collision(f.get_verts(), &ship.get_lasers()[i].get_pos())
+                        || collision(f.get_ghost_verts(), &ship.get_lasers()[i].get_pos())
+                });
                 if index != None {
                     divide_remove(asteroids, index.unwrap());
                     to_remove.push(i);
@@ -118,12 +152,14 @@ impl Win {
             }
 
             for asteroid in asteroids.iter_mut() {
-                if ship
-                    .get_verts()
-                    .iter()
-                    .zip(ship.get_ghost_verts())
-                    .any(|f| asteroid.collision(f.0) || asteroid.collision(f.1))
-                {
+                if ship.get_verts().iter_mut().any(|f| {
+                    collision(asteroid.get_verts(), f) || collision(asteroid.get_ghost_verts(), f)
+                }) {
+                    break 'running;
+                }
+                if ship.get_ghost_verts().iter_mut().any(|f| {
+                    collision(asteroid.get_verts(), f) || collision(asteroid.get_ghost_verts(), f)
+                }) {
                     break 'running;
                 }
             }
@@ -138,6 +174,8 @@ impl Win {
             ship.draw(&self.canvas);
             asteroids.iter_mut().for_each(|f| f.draw(&self.canvas));
 
+            // let _=
+
             self.canvas.set_draw_color(Color::BLACK);
 
             self.canvas.present();
@@ -149,6 +187,7 @@ impl Win {
 pub fn get_edge_pos() -> (f32, f32) {
     let mut width = rand::thread_rng().gen_range(0..SIZE as u16) as f32;
     let mut height = rand::thread_rng().gen_range(0..SIZE as u16) as f32;
+
     if rand::thread_rng().gen_bool(0.5) {
         if rand::thread_rng().gen_bool(0.5) {
             width = 0.;
