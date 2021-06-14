@@ -8,6 +8,6 @@ mod window;
 
 use window::Win;
 
-fn main() {
-    Win::new().reset();
+fn main() -> Result<(), String> {
+    Win::new().unwrap().reset()
 }

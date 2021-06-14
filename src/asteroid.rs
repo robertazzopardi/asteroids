@@ -6,8 +6,10 @@ use rand::Rng;
 use sdl2::{gfx::primitives::DrawRenderer, pixels::Color, render::Canvas, video::Window};
 use std::mem;
 
-const ASTEROID_COUNT: u16 = 3;
 pub const ASTEROID_VERTS: usize = 20;
+const ASTEROID_COUNT: u16 = 3;
+const SPEED_MIN: f32 = 1.;
+static mut SPEED_MAX: f32 = 1.7;
 
 #[derive(Clone)]
 pub struct Asteroid {
@@ -56,11 +58,11 @@ impl Asteroid {
         }
     }
 
-    pub fn new(min: u16, max: u16, center_x: f32, center_y: f32) -> Asteroid {
+    pub fn new(min_r: u16, max_r: u16, center_x: f32, center_y: f32) -> Asteroid {
         let mut verts = Vec::new();
 
         for i in 0..ASTEROID_VERTS {
-            let radius = rand::thread_rng().gen_range(min..max) as f32;
+            let radius = rand::thread_rng().gen_range(min_r..max_r) as f32;
 
             let angle = (i as f32 / ASTEROID_VERTS as f32) * 6.28318;
 
@@ -73,23 +75,32 @@ impl Asteroid {
         let center = get_center(&verts);
         let angle_to_center = (MID_SIZE - center.y).atan2(MID_SIZE - center.x);
 
+        let vel_x;
+        let vel_y;
+        unsafe {
+            vel_x = SPEED_MIN..SPEED_MAX;
+            vel_y = SPEED_MIN..SPEED_MAX;
+        }
         Asteroid {
             verts: verts.clone(),
             ghost_verts: verts,
             vel: Vec2::new(
-                rand::thread_rng().gen_range(0.7..1.7),
-                rand::thread_rng().gen_range(0.7..1.7),
+                rand::thread_rng().gen_range(vel_x),
+                rand::thread_rng().gen_range(vel_y),
             ),
             angle: angle_to_center,
             divided: false,
         }
     }
 
+    /// Draw the asteroid
     pub fn draw(&mut self, canvas: &Canvas<Window>) {
+        // Main verts
         let dxy = convert_to_xy_vec(&self.verts);
         let _ = canvas.filled_polygon(&dxy.0, &dxy.1, Color::BLACK);
         let _ = canvas.aa_polygon(&dxy.0, &dxy.1, Color::WHITE);
 
+        // Draw ghost verts if they are on the screen
         if !self
             .verts
             .iter()
@@ -123,7 +134,6 @@ pub fn collision(verts: &mut Vec<Vec2>, point: &Vec2) -> bool {
 
     for i in 0..verts.len() {
         if trace(verts, i, point, j) {
-            // || trace(&self.ghost_verts, i, point, j) {
             collision = !collision;
         }
         j = i;
@@ -141,6 +151,10 @@ fn trace(verts: &[Vec2], i: usize, point: &Vec2, j: usize) -> bool {
 }
 
 pub fn divide_remove(asteroids: &mut Vec<Asteroid>, index: usize) {
+    unsafe {
+        SPEED_MAX += 0.1;
+    }
+
     let asteroid = asteroids.remove(index);
 
     if !asteroid.divided {
