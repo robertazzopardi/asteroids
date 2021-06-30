@@ -1,6 +1,9 @@
 use crate::{
-    math::{convert_to_xy_vec, get_center, rand_angle, UpdateVerts, Vec2},
-    window::{get_edge_pos, MID_SIZE, SIZE},
+    math::{
+        functions::{get_random_radius, rand_angle},
+        vec2::{UpdateVerts, Vec2, Vec2Vec},
+    },
+    render::window::{MID_SIZE, SIZE},
 };
 use rand::Rng;
 use sdl2::{gfx::primitives::DrawRenderer, pixels::Color, render::Canvas, video::Window};
@@ -18,6 +21,16 @@ pub struct Asteroid {
     vel: Vec2,
     angle: f32,
     divided: bool,
+}
+
+pub trait RemoveAsteroid<Asteroid> {
+    fn break_up(&mut self, index: usize);
+}
+
+impl RemoveAsteroid<Asteroid> for Vec<Asteroid> {
+    fn break_up(&mut self, index: usize) {
+        divide_remove(self, index);
+    }
 }
 
 impl UpdateVerts for Asteroid {
@@ -38,8 +51,8 @@ impl Asteroid {
     pub fn new_vec() -> Vec<Asteroid> {
         let mut asteroids: Vec<Asteroid> = Vec::new();
         for _ in 0..ASTEROID_COUNT {
-            let center = get_edge_pos();
-            asteroids.push(Asteroid::new(40, 100, center.0, center.1));
+            let (x, y) = get_random_radius();
+            asteroids.push(Asteroid::new(40, 100, x, y));
         }
 
         asteroids
@@ -72,15 +85,12 @@ impl Asteroid {
             ));
         }
 
-        let center = get_center(&verts);
+        let center = verts.get_center();
         let angle_to_center = (MID_SIZE - center.y).atan2(MID_SIZE - center.x);
 
-        let vel_x;
-        let vel_y;
-        unsafe {
-            vel_x = SPEED_MIN..SPEED_MAX;
-            vel_y = SPEED_MIN..SPEED_MAX;
-        }
+        let vel_x = unsafe { SPEED_MIN..SPEED_MAX };
+        let vel_y = unsafe { SPEED_MIN..SPEED_MAX };
+
         Asteroid {
             verts: verts.clone(),
             ghost_verts: verts,
@@ -96,9 +106,9 @@ impl Asteroid {
     /// Draw the asteroid
     pub fn draw(&mut self, canvas: &Canvas<Window>) {
         // Main verts
-        let dxy = convert_to_xy_vec(&self.verts);
-        let _ = canvas.filled_polygon(&dxy.0, &dxy.1, Color::BLACK);
-        let _ = canvas.aa_polygon(&dxy.0, &dxy.1, Color::WHITE);
+        let (x, y) = self.verts.convert_to_xy_vec();
+        let _ = canvas.filled_polygon(&x, &y, Color::BLACK);
+        let _ = canvas.aa_polygon(&x, &y, Color::WHITE);
 
         // Draw ghost verts if they are on the screen
         if !self
@@ -106,34 +116,28 @@ impl Asteroid {
             .iter()
             .all(|f| f.x < SIZE && f.x > 0. && f.y < SIZE && f.y > 0.)
         {
-            let dxy = convert_to_xy_vec(&self.ghost_verts);
-            let _ = canvas.filled_polygon(&dxy.0, &dxy.1, Color::BLACK);
-            let _ = canvas.aa_polygon(&dxy.0, &dxy.1, Color::WHITE);
+            let (x, y) = self.ghost_verts.convert_to_xy_vec();
+            let _ = canvas.filled_polygon(&x, &y, Color::BLACK);
+            let _ = canvas.aa_polygon(&x, &y, Color::WHITE);
         }
     }
 
-    // pub fn collision(&mut self, point: &Vec2) -> bool {
-    //     let mut collision = false;
-    //     let mut j = self.verts.len() - 1;
-
-    //     for i in 0..self.verts.len() {
-    //         if trace(&self.verts, i, point, j) {
-    //             // || trace(&self.ghost_verts, i, point, j) {
-    //             collision = !collision;
-    //         }
-    //         j = i;
-    //     }
-
-    //     collision
-    // }
+    pub fn collision(&mut self, point: &Vec2) -> bool {
+        collision(self.get_verts(), point) || collision(self.get_ghost_verts(), point)
+    }
 }
 
-pub fn collision(verts: &mut Vec<Vec2>, point: &Vec2) -> bool {
+fn collision(verts: &mut Vec<Vec2>, point: &Vec2) -> bool {
     let mut collision = false;
     let mut j = verts.len() - 1;
 
     for i in 0..verts.len() {
-        if trace(verts, i, point, j) {
+        // if trace(verts, i, point, j) {
+        if ((verts[i].y > point.y) != (verts[j].y > point.y))
+            && (point.x
+                < (verts[j].x - verts[i].x) * (point.y - verts[i].y) / (verts[j].y - verts[i].y)
+                    + verts[i].x)
+        {
             collision = !collision;
         }
         j = i;
@@ -142,25 +146,15 @@ pub fn collision(verts: &mut Vec<Vec2>, point: &Vec2) -> bool {
     collision
 }
 
-#[inline]
-fn trace(verts: &[Vec2], i: usize, point: &Vec2, j: usize) -> bool {
-    ((verts[i].y > point.y) != (verts[j].y > point.y))
-        && (point.x
-            < (verts[j].x - verts[i].x) * (point.y - verts[i].y) / (verts[j].y - verts[i].y)
-                + verts[i].x)
-}
-
-pub fn divide_remove(asteroids: &mut Vec<Asteroid>, index: usize) {
-    unsafe {
-        SPEED_MAX += 0.1;
-    }
+fn divide_remove(asteroids: &mut Vec<Asteroid>, index: usize) {
+    unsafe { SPEED_MAX += 0.1 }
 
     let asteroid = asteroids.remove(index);
 
     if !asteroid.divided {
-        let center = get_center(&asteroid.verts);
+        let Vec2 { x, y } = asteroid.verts.get_center();
         for _ in 0..rand::thread_rng().gen_range(2..4) {
-            let new_asteroid = &mut Asteroid::new(20, 50, center.x, center.y);
+            let new_asteroid = &mut Asteroid::new(20, 50, x, y);
             new_asteroid.divided = true;
             new_asteroid.angle = rand_angle();
 
@@ -170,8 +164,8 @@ pub fn divide_remove(asteroids: &mut Vec<Asteroid>, index: usize) {
 
     if asteroids.is_empty() {
         for _ in 0..2 {
-            let center = get_edge_pos();
-            asteroids.push(Asteroid::new(40, 100, center.0, center.1));
+            let (x, y) = get_random_radius();
+            asteroids.push(Asteroid::new(40, 100, x, y));
         }
     }
 }

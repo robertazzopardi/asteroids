@@ -1,12 +1,8 @@
-extern crate sdl2;
-
-mod asteroid;
+mod entity;
 mod math;
-mod ship;
-mod star;
-mod window;
+mod render;
 
-use window::Win;
+use render::window::Win;
 
 fn main() -> Result<(), String> {
     Win::new().unwrap().reset()

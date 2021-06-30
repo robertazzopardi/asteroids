@@ -1,10 +1,10 @@
-use crate::{math::Vec2, window::SIZE};
+use crate::math::vec2::Vec2;
+use crate::render::window::SIZE;
 use rand::Rng;
 use sdl2::{gfx::primitives::DrawRenderer, pixels::Color, render::Canvas, video::Window};
 
 const STAR_COUNT: usize = 200;
 
-#[derive(Clone)]
 pub struct Star {
     pos: Vec2,
     r: i16,
