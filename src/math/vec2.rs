@@ -65,6 +65,9 @@ pub fn wrap_verts<T: UpdateVerts>(main: &mut T) {
             main.get_ghost_verts()[i].y = main.get_verts()[i].y + dy;
         }
     }
+    // else {
+    //     return;
+    // }
 
     if main
         .get_verts()

@@ -7,7 +7,7 @@ use crate::{
 };
 use rand::Rng;
 use sdl2::{gfx::primitives::DrawRenderer, pixels::Color, render::Canvas, video::Window};
-use std::mem;
+use std::{f32::consts::PI, mem};
 
 pub const ASTEROID_VERTS: usize = 20;
 const ASTEROID_COUNT: u16 = 3;
@@ -58,19 +58,6 @@ impl Asteroid {
         asteroids
     }
 
-    pub fn update(&mut self) {
-        let vel_x = self.vel.x * self.angle.cos();
-        let vel_y = self.vel.y * self.angle.sin();
-
-        for i in 0..self.verts.len() {
-            self.verts[i].x += vel_x;
-            self.verts[i].y += vel_y;
-
-            self.ghost_verts[i].x += vel_x;
-            self.ghost_verts[i].y += vel_y;
-        }
-    }
-
     pub fn new(min_r: u16, max_r: u16, center_x: f32, center_y: f32) -> Asteroid {
         let mut verts = Vec::new();
 
@@ -86,7 +73,9 @@ impl Asteroid {
         }
 
         let center = verts.get_center();
-        let angle_to_center = (MID_SIZE - center.y).atan2(MID_SIZE - center.x);
+        let mut angle_to_center = (MID_SIZE - center.y).atan2(MID_SIZE - center.x);
+        // println!("{}", 2. * PI_32 * rand::thread_rng().gen::<f32>());
+        angle_to_center += 2. * PI * rand::thread_rng().gen::<f32>();
 
         let vel_x = unsafe { SPEED_MIN..SPEED_MAX };
         let vel_y = unsafe { SPEED_MIN..SPEED_MAX };
@@ -100,6 +89,19 @@ impl Asteroid {
             ),
             angle: angle_to_center,
             divided: false,
+        }
+    }
+
+    pub fn update(&mut self) {
+        let vel_x = self.vel.x * self.angle.cos();
+        let vel_y = self.vel.y * self.angle.sin();
+
+        for i in 0..self.verts.len() {
+            self.verts[i].x += vel_x;
+            self.verts[i].y += vel_y;
+
+            self.ghost_verts[i].x += vel_x;
+            self.ghost_verts[i].y += vel_y;
         }
     }
 

@@ -104,6 +104,8 @@ impl Win {
                 dt = (((now - last) * 1000) / SDL_GetPerformanceFrequency()) as f32 * 0.001;
             }
 
+            println!("{}", 1. / dt);
+
             self.canvas.clear();
 
             // check events
@@ -144,11 +146,8 @@ impl Win {
 
                 if index != None {
                     asteroids.break_up(index.unwrap());
-
                     ship.remove_laser(i);
-
                     score += 10;
-
                     text = Text::new(score, &font, &self.texture_creator).unwrap();
                 }
             }
@@ -162,7 +161,6 @@ impl Win {
 
             // check wrapping
             wrap_verts(ship);
-
             asteroids.iter_mut().for_each(|f| wrap_verts(f));
 
             // draw entities
@@ -172,10 +170,12 @@ impl Win {
 
             self.canvas.set_draw_color(Color::BLACK);
 
+            // Draw text
             self.canvas
                 .copy(&text.texture, None, Some(text.target))
                 .unwrap();
 
+            // Display
             self.canvas.present();
 
             ::std::thread::sleep(duration);
