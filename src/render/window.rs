@@ -14,16 +14,14 @@ use sdl2::{
     keyboard::Keycode,
     pixels::Color,
     render::{Canvas, TextureCreator},
-    sys::{SDL_GetPerformanceCounter, SDL_GetPerformanceFrequency},
     ttf::Sdl2TtfContext,
     video::{Window, WindowContext},
-    EventPump,
+    EventPump, TimerSubsystem,
 };
-use std::{path::Path, time::Duration};
+use std::path::Path;
 
 pub const SIZE: f32 = 800.;
 pub const MID_SIZE: f32 = SIZE / 2.;
-const NANOS: u32 = 1_000_000_000u32 / 60;
 const FILE_PATH: &str = "../../assets/open-sans/OpenSans-ExtraBold.ttf";
 
 pub trait GetKey {
@@ -44,6 +42,7 @@ pub struct Win {
     event_pump: EventPump,
     ttf_context: Sdl2TtfContext,
     texture_creator: TextureCreator<WindowContext>,
+    timer_subsystem: TimerSubsystem,
 }
 
 impl Win {
@@ -57,7 +56,7 @@ impl Win {
             .build()
             .unwrap();
 
-        let mut canvas = window.into_canvas().build().unwrap();
+        let mut canvas = window.into_canvas().present_vsync().build().unwrap();
 
         canvas.set_draw_color(Color::BLACK);
         canvas.clear();
@@ -67,46 +66,36 @@ impl Win {
         let ttf_context = sdl2::ttf::init().map_err(|e| e.to_string()).unwrap();
         let texture_creator = canvas.texture_creator();
 
+        let timer_subsystem = sdl_context.timer()?;
+
         Ok(Win {
             canvas,
             event_pump,
             ttf_context,
             texture_creator,
+            timer_subsystem,
         })
     }
 
     pub fn reset(&mut self) -> Result<(), String> {
-        let mut now = unsafe { SDL_GetPerformanceCounter() };
-        let mut dt;
+        let mut dt = 0.;
 
         // Create Entities
         let stars = &mut Star::new_vec();
         let ship = &mut Ship::new();
         let asteroids = &mut Asteroid::new_vec();
 
-        let duration = Duration::new(0, NANOS);
-
-        let mut score: u32 = 0;
-
         // Load a font
         let path: &Path = Path::new(FILE_PATH);
         let mut font = self.ttf_context.load_font(path, 28)?;
         font.set_style(sdl2::ttf::FontStyle::BOLD);
 
+        let mut score: u32 = 0;
         let mut text = Text::new(score, &font, &self.texture_creator).unwrap();
 
         // Main loop
         'running: loop {
-            // Get delta time
-            let last = now;
-            unsafe {
-                now = SDL_GetPerformanceCounter();
-                dt = (((now - last) * 1000) / SDL_GetPerformanceFrequency()) as f32 * 0.001;
-            }
-
-            println!("{}", 1. / dt);
-
-            self.canvas.clear();
+            let start = self.timer_subsystem.performance_counter();
 
             // check events
             for event in self.event_pump.poll_iter() {
@@ -123,6 +112,8 @@ impl Win {
             }
 
             // The rest of the game loop goes here...
+
+            self.canvas.clear();
 
             // update entities
             ship.update(dt);
@@ -163,7 +154,7 @@ impl Win {
             wrap_verts(ship);
             asteroids.iter_mut().for_each(|f| wrap_verts(f));
 
-            // draw entities
+            // Render
             stars.iter_mut().for_each(|f| f.draw(&self.canvas));
             ship.draw(&self.canvas);
             asteroids.iter_mut().for_each(|f| f.draw(&self.canvas));
@@ -178,7 +169,9 @@ impl Win {
             // Display
             self.canvas.present();
 
-            ::std::thread::sleep(duration);
+            let end = self.timer_subsystem.performance_counter();
+            dt = (end - start) as f32 / self.timer_subsystem.performance_frequency() as f32;
+            // println!("{}", 1. / dt);
         }
 
         Ok(())
