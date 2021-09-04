@@ -47,8 +47,8 @@ pub struct Win {
 
 impl Win {
     pub fn new() -> Result<Win, String> {
-        let sdl_context = sdl2::init().unwrap();
-        let video_subsystem = sdl_context.video().unwrap();
+        let sdl_context = sdl2::init()?;
+        let video_subsystem = sdl_context.video()?;
 
         let window = video_subsystem
             .window("Asteroids", SIZE as u32, SIZE as u32)
@@ -56,29 +56,21 @@ impl Win {
             .build()
             .unwrap();
 
-        let mut canvas = window.into_canvas().present_vsync().build().unwrap();
+        let canvas = window.into_canvas().present_vsync().build().unwrap();
 
-        canvas.set_draw_color(Color::BLACK);
-        canvas.clear();
-        canvas.present();
-
-        let event_pump = sdl_context.event_pump().unwrap();
-        let ttf_context = sdl2::ttf::init().map_err(|e| e.to_string()).unwrap();
         let texture_creator = canvas.texture_creator();
-
-        let timer_subsystem = sdl_context.timer()?;
 
         Ok(Win {
             canvas,
-            event_pump,
-            ttf_context,
+            event_pump: sdl_context.event_pump()?,
+            ttf_context: sdl2::ttf::init().map_err(|e| e.to_string())?,
             texture_creator,
-            timer_subsystem,
+            timer_subsystem: sdl_context.timer()?,
         })
     }
 
     pub fn reset(&mut self) -> Result<(), String> {
-        let mut dt = 0.;
+        // let mut dt = 0.;
 
         // Create Entities
         let stars = &mut Star::new_vec();
@@ -91,13 +83,15 @@ impl Win {
         font.set_style(sdl2::ttf::FontStyle::BOLD);
 
         let mut score: u32 = 0;
-        let mut text = Text::new(score, &font, &self.texture_creator).unwrap();
+        let mut text = Text::new(score, &font, &self.texture_creator)?;
+
+        let mut last_update = self.timer_subsystem.ticks();
 
         // Main loop
         'running: loop {
             let start = self.timer_subsystem.performance_counter();
 
-            // check events
+            // Do event loop
             for event in self.event_pump.poll_iter() {
                 match event {
                     Event::Quit { .. }
@@ -111,32 +105,19 @@ impl Win {
                 }
             }
 
-            // The rest of the game loop goes here...
-
-            self.canvas.clear();
-
-            // update entities
-            ship.update(dt);
-
-            for asteroid in asteroids.iter_mut() {
-                asteroid.update();
-            }
-
             // spawn asteroid randomly with low chance
             if rand::thread_rng().gen::<f32>() < 0.005 && asteroids.len() < 11 {
                 let (x, y) = get_random_radius();
-                let new_asteroid = Asteroid::new(40, 100, x, y);
-                asteroids.push(new_asteroid);
+                asteroids.push(Asteroid::new(40, 100, x, y));
             }
 
             // Check collisions
             for i in (0..ship.get_lasers().len()).rev() {
-                let index = asteroids
+                if let Some(index) = asteroids
                     .iter_mut()
-                    .position(|asteroid| asteroid.collision(ship.get_lasers()[i].get_pos()));
-
-                if index != None {
-                    asteroids.break_up(index.unwrap());
+                    .position(|asteroid| asteroid.collision(ship.get_lasers()[i].get_pos()))
+                {
+                    asteroids.break_up(index);
                     ship.remove_laser(i);
                     score += 10;
                     text = Text::new(score, &font, &self.texture_creator).unwrap();
@@ -150,6 +131,21 @@ impl Win {
                 }
             }
 
+            // Do physics loop
+            let current: u32 = self.timer_subsystem.ticks();
+            let dt = (current - last_update) as f32 / 1000.;
+
+            // Set updated time
+            last_update = current;
+
+            ship.update(dt);
+            for asteroid in asteroids.iter_mut() {
+                asteroid.update();
+            }
+
+            // Do rendering loop
+            self.canvas.clear();
+
             // check wrapping
             wrap_verts(ship);
             asteroids.iter_mut().for_each(|f| wrap_verts(f));
@@ -162,16 +158,15 @@ impl Win {
             self.canvas.set_draw_color(Color::BLACK);
 
             // Draw text
-            self.canvas
-                .copy(&text.texture, None, Some(text.target))
-                .unwrap();
+            self.canvas.copy(&text.texture, None, Some(text.target))?;
 
             // Display
             self.canvas.present();
 
             let end = self.timer_subsystem.performance_counter();
-            dt = (end - start) as f32 / self.timer_subsystem.performance_frequency() as f32;
-            // println!("{}", 1. / dt);
+            let _elapsed =
+                (end - start) as f32 / self.timer_subsystem.performance_frequency() as f32;
+            // println!("{}", 1. / _elapsed);
         }
 
         Ok(())

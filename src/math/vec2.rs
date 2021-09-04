@@ -1,7 +1,5 @@
 use crate::render::window::SIZE;
 
-// type V = Vec<Vec2<f32>>;
-
 #[derive(Clone)]
 pub struct Vec2 {
     pub x: f32,
@@ -36,7 +34,6 @@ impl Vec2 {
 pub trait UpdateVerts {
     fn get_verts(&mut self) -> &mut Vec<Vec2>;
     fn get_ghost_verts(&mut self) -> &mut Vec<Vec2>;
-
     fn swap(&mut self);
 }
 
@@ -65,9 +62,6 @@ pub fn wrap_verts<T: UpdateVerts>(main: &mut T) {
             main.get_ghost_verts()[i].y = main.get_verts()[i].y + dy;
         }
     }
-    // else {
-    //     return;
-    // }
 
     if main
         .get_verts()
@@ -82,6 +76,7 @@ pub trait Vec2Vec {
     fn get_center(&self) -> Vec2;
     fn rotate(&mut self, angle: f32);
     fn convert_to_xy_vec(&self) -> (Vec<i16>, Vec<i16>);
+    fn collision(&self, point: &Vec2) -> bool;
 }
 
 impl Vec2Vec for Vec<Vec2> {
@@ -120,5 +115,23 @@ impl Vec2Vec for Vec<Vec2> {
         }
 
         (array_x, array_y)
+    }
+
+    fn collision(&self, point: &Vec2) -> bool {
+        let mut collision = false;
+        let mut j = self.len() - 1;
+
+        for i in 0..self.len() {
+            if ((self[i].y > point.y) != (self[j].y > point.y))
+                && (point.x
+                    < (self[j].x - self[i].x) * (point.y - self[i].y) / (self[j].y - self[i].y)
+                        + self[i].x)
+            {
+                collision = !collision;
+            }
+            j = i;
+        }
+
+        collision
     }
 }

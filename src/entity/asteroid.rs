@@ -10,7 +10,6 @@ use sdl2::{gfx::primitives::DrawRenderer, pixels::Color, render::Canvas, video::
 use std::{f32::consts::PI, mem};
 
 pub const ASTEROID_VERTS: usize = 20;
-const ASTEROID_COUNT: u16 = 3;
 const SPEED_MIN: f32 = 1.;
 static mut SPEED_MAX: f32 = 1.7;
 
@@ -29,7 +28,28 @@ pub trait RemoveAsteroid<Asteroid> {
 
 impl RemoveAsteroid<Asteroid> for Vec<Asteroid> {
     fn break_up(&mut self, index: usize) {
-        divide_remove(self, index);
+        // divide_remove(self, index);
+        unsafe { SPEED_MAX += 0.1 }
+
+        let asteroid = self.remove(index);
+
+        if !asteroid.divided {
+            let Vec2 { x, y } = asteroid.verts.get_center();
+            for _ in 0..rand::thread_rng().gen_range(2..4) {
+                let new_asteroid = &mut Asteroid::new(20, 50, x, y);
+                new_asteroid.divided = true;
+                new_asteroid.angle = rand_angle();
+
+                self.push(new_asteroid.clone());
+            }
+        }
+
+        if self.is_empty() {
+            for _ in 0..2 {
+                let (x, y) = get_random_radius();
+                self.push(Asteroid::new(40, 100, x, y));
+            }
+        }
     }
 }
 
@@ -50,7 +70,7 @@ impl UpdateVerts for Asteroid {
 impl Asteroid {
     pub fn new_vec() -> Vec<Asteroid> {
         let mut asteroids: Vec<Asteroid> = Vec::new();
-        for _ in 0..ASTEROID_COUNT {
+        for _ in 0..3 {
             let (x, y) = get_random_radius();
             asteroids.push(Asteroid::new(40, 100, x, y));
         }
@@ -125,49 +145,6 @@ impl Asteroid {
     }
 
     pub fn collision(&mut self, point: &Vec2) -> bool {
-        collision(self.get_verts(), point) || collision(self.get_ghost_verts(), point)
-    }
-}
-
-fn collision(verts: &mut Vec<Vec2>, point: &Vec2) -> bool {
-    let mut collision = false;
-    let mut j = verts.len() - 1;
-
-    for i in 0..verts.len() {
-        // if trace(verts, i, point, j) {
-        if ((verts[i].y > point.y) != (verts[j].y > point.y))
-            && (point.x
-                < (verts[j].x - verts[i].x) * (point.y - verts[i].y) / (verts[j].y - verts[i].y)
-                    + verts[i].x)
-        {
-            collision = !collision;
-        }
-        j = i;
-    }
-
-    collision
-}
-
-fn divide_remove(asteroids: &mut Vec<Asteroid>, index: usize) {
-    unsafe { SPEED_MAX += 0.1 }
-
-    let asteroid = asteroids.remove(index);
-
-    if !asteroid.divided {
-        let Vec2 { x, y } = asteroid.verts.get_center();
-        for _ in 0..rand::thread_rng().gen_range(2..4) {
-            let new_asteroid = &mut Asteroid::new(20, 50, x, y);
-            new_asteroid.divided = true;
-            new_asteroid.angle = rand_angle();
-
-            asteroids.push(new_asteroid.clone());
-        }
-    }
-
-    if asteroids.is_empty() {
-        for _ in 0..2 {
-            let (x, y) = get_random_radius();
-            asteroids.push(Asteroid::new(40, 100, x, y));
-        }
+        self.verts.collision(point) || self.ghost_verts.collision(point)
     }
 }

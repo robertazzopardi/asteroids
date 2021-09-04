@@ -5,5 +5,5 @@ mod render;
 use render::window::Win;
 
 fn main() -> Result<(), String> {
-    Win::new().unwrap().reset()
+    Win::new()?.reset()
 }

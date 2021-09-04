@@ -33,9 +33,10 @@ impl<'a> Text<'_> {
 
         // If the example text is too big for the screen, downscale it (and center irregardless)
         let padding = 64;
-        let target = get_centered_rect(width, height, SIZE as u32 - padding, SIZE as u32 - padding);
-
-        Ok(Text { texture, target })
+        Ok(Text {
+            texture,
+            target: get_centered_rect(width, height, SIZE as u32 - padding, SIZE as u32 - padding),
+        })
     }
 }
 

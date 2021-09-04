@@ -40,7 +40,6 @@ impl UpdateVerts for Ship {
     /// Swap the Main verts for the ship with the ghost verts
     fn swap(&mut self) {
         mem::swap(&mut self.verts, &mut self.ghost_verts);
-
         mem::swap(&mut self.ghost_verts, &mut self.verts.clone());
     }
 }
@@ -56,10 +55,9 @@ impl Ship {
     }
 
     pub fn do_action(&mut self, event: &Event) {
-        let code = event.get_keycode();
-        match code {
+        match event.get_keycode() {
             (Keycode::Right | Keycode::Left, Event::KeyDown { .. }) => {
-                self.rot = if code.0 == Keycode::Right {
+                self.rot = if event.get_keycode().0 == Keycode::Right {
                     ROTATION_AMOUNT
                 } else {
                     -ROTATION_AMOUNT
@@ -102,7 +100,7 @@ impl Ship {
         self.verts.rotate(self.rot * dt);
         self.ghost_verts.rotate(self.rot * dt);
 
-        // Decay Speed (Even though in space there is no friction, its a bit easier this way)
+        // Decay Speed (Even though in space there is no friction)
         self.vel.x *= 0.98;
         self.vel.y *= 0.98;
 
