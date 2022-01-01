@@ -22,5 +22,3 @@ target/
 *.iml
 .idea/
 .vscode/
-
-Cargo.lock

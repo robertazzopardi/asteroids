@@ -148,7 +148,7 @@ impl Win {
 
             // check wrapping
             wrap_verts(ship);
-            asteroids.iter_mut().for_each(|f| wrap_verts(f));
+            asteroids.iter_mut().for_each(wrap_verts);
 
             // Render
             stars.iter_mut().for_each(|f| f.draw(&self.canvas));
@@ -166,7 +166,7 @@ impl Win {
             let end = self.timer_subsystem.performance_counter();
             let _elapsed =
                 (end - start) as f32 / self.timer_subsystem.performance_frequency() as f32;
-            // println!("{}", 1. / _elapsed);
+            // println!("{}", (1. / _elapsed).round());
         }
 
         Ok(())

@@ -7,7 +7,7 @@ use crate::{
 };
 use rand::Rng;
 use sdl2::{gfx::primitives::DrawRenderer, pixels::Color, render::Canvas, video::Window};
-use std::{f32::consts::PI, mem};
+use std::{f32::consts::PI, f32::consts::TAU, mem};
 
 pub const ASTEROID_VERTS: usize = 20;
 const SPEED_MIN: f32 = 1.;
@@ -84,7 +84,7 @@ impl Asteroid {
         for i in 0..ASTEROID_VERTS {
             let radius = rand::thread_rng().gen_range(min_r..max_r) as f32;
 
-            let angle = (i as f32 / ASTEROID_VERTS as f32) * 6.28318;
+            let angle = (i as f32 / ASTEROID_VERTS as f32) * TAU;
 
             verts.push(Vec2::new(
                 radius * angle.sin() + center_x,
